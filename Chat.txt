@@ -1,0 +1,324 @@
+#pragma once
+#include <vector>
+//#include <exception>
+#include <memory>
+#include "Message.h"
+
+/*class FalseLogin : public std::exception
+{	virtual const char* what() const noexcept override { return "ERROR: user login is busy!"; } };
+
+class FalseName : public std::exception
+{	virtual const char* what() const noexcept override { return "ERROR: user name is busy!"; } };*/
+
+class Chat 
+{
+	std::vector<User> users_;
+	int idStorage_ = 0;
+
+	bool isChatWork_ = false;
+	std::vector<Message> messages_;
+	std::shared_ptr<User> currentUser_ = nullptr;
+
+	bool checkLogin(const std::string& login);
+	bool checkName(const std::string& name);
+	bool checkPassword(const std::string& name, const std::string& password);
+	void signUp();
+	void login();
+	void deleteUser(User& user); // delete user, but ID doesn't change
+	void changeUser(User& user);
+	void printAllInf();
+
+
+	void showChat() const;
+	void showAllUserName() const;
+	void addMessage();
+	std::vector<User>& getAllUser() { return users_; };
+	std::vector<Message>& getAllMessage() { return messages_; };
+
+public:
+	void start();
+	bool isChatWork() const { return isChatWork_; }
+	std::shared_ptr<User> getCurrentUser() const { return currentUser_; }
+	void showLoginMenu();
+	void showUserMenu();
+};
+
+#include <iostream>
+#include "Chat.h"
+
+void Chat::start()
+{
+	isChatWork_ = true;
+}
+
+bool Chat::checkLogin(const std::string& login)
+{
+	for (auto& user : users_)
+	{
+		if (login == user.getUserLogin())
+			return true;
+	}
+	return false;
+}
+
+bool Chat::checkName(const std::string& name)
+{
+	for (auto& user : users_)
+	{
+		if (name == user.getUserName())
+			return true;
+	}
+	return false;
+}
+
+bool Chat::checkPassword(const std::string& login, const std::string& password)
+{
+	for (auto& user : users_)
+	{
+		if (login == user.getUserLogin())
+			return (password == user.getUserPassword()) ? true : false;
+	}
+	return false;
+}
+
+
+void Chat::signUp()
+{
+	std::string login, password, name;
+	bool flag = false;
+
+	do
+	{
+		std::cout << "login: ";
+		std::cin >> login;
+		std::cout << "password: ";
+		std::cin >> password;
+		std::cout << "name: ";
+		std::cin >> name;
+		if (checkLogin(login))
+		{
+			flag = false;
+			std::cout << "ERROR: user login is busy! Try again" << "\n";
+		}
+		else if (checkName(name))
+		{
+			flag = false;
+			std::cout << "ERROR: user name is busy! Try again" << "\n";
+		}
+		else
+		{
+			flag = true;
+			std::cout << "All correct!" << "\n";
+		}
+	} while (flag == false);
+
+	User user = User(login, password, name);
+	user.setID(++idStorage_);
+	users_.push_back(user);
+	//currentUser_ = std::make_shared<User>(user);
+}
+
+void Chat::login()
+{
+	std::string login, password;
+	char operation;
+	bool flag = false;
+	do
+	{
+		std::cout << "login: ";
+		std::cin >> login;
+		std::cout << "password: ";
+		std::cin >> password;
+
+		if (!checkPassword(login, password))
+		{
+			flag = false;
+			std::cout << "Login failed! Try again (any key) or exit(0): " << "\n";
+			std::cin >> operation;
+			if (operation == '0')
+				break;
+		}
+		else
+		{
+			flag = true;
+			std::cout << "All correct!" << "\n";
+		}
+	} while (flag == false);
+}
+
+void Chat::showChat() const
+{
+	std::string from, to;
+	std::cout << "--- Chat ---" << std::endl;
+
+	for (auto& mess : messages_)
+	{
+		if (currentUser_->getUserLogin() == mess.getFrom() || currentUser_->getUserLogin() == mess.getTo() || mess.getTo() == "all")
+		{
+			from = (currentUser_->getUserLogin() == mess.getFrom()) ? "me" : getUserByLogin(mess.getFrom())->getUserName();
+			if (mess.getTo() == "all")
+				to = "all";
+			else
+				to = (currentUser_->getUserLogin() == mess.getTo()) ? "me" : getUserByLogin(mess.getTo())->getUserName();
+			std::cout << "Message from " << from << " to " << to << std::endl;
+			std::cout << "text: " << mess.getText() << std::endl;
+		}
+	
+	}
+	std::cout << "---------" << std::endl;
+}
+
+
+
+
+void Chat::showAllUserName() const
+{
+	std::cout << "--- Users ---" << std::endl;
+	for (auto& user : users_)
+	{
+		std::cout << user.getUserName();
+		if (currentUser_->getUserLogin() == user.getUserLogin())
+			std::cout << "(me)";
+		std::cout << std::endl;
+	}
+	std::cout << "---------" << std::endl;
+}
+
+void Chat::addMessage()
+{
+	std::string to, text;
+	
+	std::cout << "To (name or all): ";
+	std::cin >> to;
+	std::cout << "Text: ";
+	std::cin.ignore();
+	getline(std::cin, text);
+
+	if (!(to == "all" || getUserByName(to)))
+	{
+		std::cout << "error send message: can't find " << to << std::endl;
+		return;
+	}
+
+	if (to == "all")
+		messages_.push_back(Message{currentUser_->getUserLogin(), "all", text});
+	else
+		messages_.push_back(Message{currentUser_->getUserLogin(), getUserByName(to)->getUserLogin(), text });
+}
+
+void Chat::showLoginMenu()
+{
+	currentUser_ = nullptr;
+	char operation;
+
+	do
+	{
+		std::cout << "(1)Login" << std::endl;
+		std::cout << "(2)Signup" << std::endl;
+		std::cout << "(0)Shutdown" << std::endl;
+		std::cin >> operation;
+		
+		switch (operation)
+		{
+		case '1':
+			login();
+			break;
+		case '2':
+			try
+			{
+				signUp();
+			}
+			catch (const std::exception& e)
+			{
+				std::cout << e.what() << std::endl;
+			}
+		case '0':
+			isChatWork_ = false;
+			break;
+		default:
+			std::cout << "1 or 2..." << std::endl;
+			break;
+		}
+
+	} while (!currentUser_ && isChatWork_);
+}
+
+void Chat::showUserMenu()
+{
+	char operation;
+	std::cout << "Hi, " << currentUser_->getUserName() << std::endl;
+
+	while (currentUser_)
+	{
+		std::cout << "Menu: (1)Show chat | (2) Add message | (3)Users | (0)Logout" << std::endl << ">> ";
+		std::cin >> operation;
+
+		switch (operation)
+		{
+		case '1':
+			showChat();
+			break;
+		case '2':
+			addMessage();
+			break;
+		case '3':
+			showAllUserName();
+			break;
+		case '0':
+			currentUser_ = nullptr;
+			break;
+		default:
+			std::cout << "unknown choice..." << std::endl;
+			break;
+		}
+	}
+}
+
+///////////////
+
+void Chat::deleteUser(User& user)
+{
+	users_.erase(users_.begin() + user.getID() - 1);
+}
+
+void Chat::changeUser(User& user)
+{
+	std::string newU;
+	char operation;
+	std::cout << "Change (1)name or (2)password: ";
+	std::cin >> operation;
+	switch (operation)
+	{
+	case '1':
+		std::cout << "Enter new name: ";
+		std::cin >> newU;
+		if (checkName(newU))
+			std::cout << "ERROR: user name is busy! Try again" << "\n";
+		else
+			user.setUserName(newU);
+		break;
+	case '2':
+		std::cout << "Enter new password: ";
+		std::cin >> newU;
+		user.setUserPassword(newU);
+		break;
+	default:
+		std::cout << "unknown choice" << std::endl;
+		break;
+	}
+	users_.erase(users_.begin() + user.getID() - 1);
+	users_.insert(users_.begin() + user.getID() - 1, user);
+}
+
+void Chat::printAllInf()
+{
+	for (auto& inf : users_)
+	{
+		std::cout << "User ID: " << inf.getID()
+			<< " Name: " << inf.getUserName()
+			<< " Login: " << inf.getUserLogin()
+			<< " Password: " << inf.getUserPassword() << std::endl;
+	}
+}
+
+
